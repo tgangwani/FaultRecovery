@@ -86,10 +86,26 @@ public class ZooKeeperSyncClientImpl extends ZKSyncClient implements
     numBSPTasks = conf.getInt("bsp.peers.num", 1);
   }
 
+  public boolean check(TaskAttemptID taskId, long superstep) 
+    throws SyncException {
+
+    try {
+      synchronized (zk) {
+        Stat s = zk.exists(getNodeName(taskId, superstep), false);
+        if(s == null) 
+          return false;
+        return true;
+      }
+    } catch (Exception e) {
+        throw new SyncException(e.toString());
+    }
+  }
+
   @Override
   public void enterBarrier(BSPJobID jobId, TaskAttemptID taskId, long superstep)
       throws SyncException {
     LOG.debug("[" + getPeerName() + "] enter the enterbarrier: " + superstep);
+    System.out.println(getPeerName() + " enter the enterbarrier: " + superstep);
 
     try {
       synchronized (zk) {
@@ -111,6 +127,7 @@ public class ZooKeeperSyncClientImpl extends ZKSyncClient implements
         if (hasReady) {
           size--;
         }
+        System.out.println("znode size " + size);
 
         LOG.debug("===> at superstep :" + superstep + " current znode size: "
             + znodes.size() + " current znodes:" + znodes);
@@ -131,6 +148,7 @@ public class ZooKeeperSyncClientImpl extends ZKSyncClient implements
         } else {
           LOG.debug("---> at superstep: " + superstep
               + " task that is creating /ready znode:" + taskId.toString());
+          System.out.println("Size:" + size + " numBSP=" + numBSPTasks + " ,Writing ready!");
           writeNode(pathToSuperstepZnode + "/ready", null, false, null);
         }
       }
@@ -142,6 +160,7 @@ public class ZooKeeperSyncClientImpl extends ZKSyncClient implements
   @Override
   public void leaveBarrier(final BSPJobID jobId, final TaskAttemptID taskId,
       final long superstep) throws SyncException {
+    System.out.println(getPeerName() + " enter the leavebarrier: " + superstep);
     try {
       // final String pathToSuperstepZnode = bspRoot + "/"
       // + taskId.getJobID().toString() + "/" + superstep;
@@ -155,6 +174,7 @@ public class ZooKeeperSyncClientImpl extends ZKSyncClient implements
           znodes.remove("ready");
         }
         final int size = znodes.size();
+        System.out.println("znode size:" + size);
 
         LOG.debug("leaveBarrier() at superstep:" + superstep + " znode size: ("
             + size + ") znodes:" + znodes);
@@ -163,6 +183,7 @@ public class ZooKeeperSyncClientImpl extends ZKSyncClient implements
           return;
         if (1 == size) {
           try {
+            System.out.println("size=1, all other znodes have been deleted!");
             zk.delete(getNodeName(taskId, superstep), 0);
           } catch (KeeperException.NoNodeException nne) {
             LOG.debug(

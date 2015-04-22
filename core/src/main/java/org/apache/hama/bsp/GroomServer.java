@@ -973,6 +973,7 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
 
     public void markAsRecoveryTask(long superstepNumber) {
       if (this.taskStatus.getRunState() != TaskStatus.State.FAILED) {
+        LOG.info("Starting recovery task at superstep " + superstepNumber);
         this.taskStatus.setRunState(TaskStatus.State.RECOVERING);
         this.taskStatus.setPhase(TaskStatus.Phase.RECOVERING);
         this.taskStatus.setStateString("recovering");
@@ -1012,7 +1013,10 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
 
     public void launchTask() throws IOException {
       localizeTask(task);
-      taskStatus.setRunState(TaskStatus.State.RUNNING);
+      
+      if(taskStatus.getRunState() != TaskStatus.State.RECOVERING)
+        taskStatus.setRunState(TaskStatus.State.RUNNING);
+      
       this.runner = task.createRunner(GroomServer.this);
       this.runner.start();
       startTime = Calendar.getInstance().getTimeInMillis();
@@ -1213,6 +1217,7 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
       if (LOG.isDebugEnabled())
         LOG.debug("BSPPeerChild starting");
 
+      LOG.info("BSPPeerChild starting");
       final HamaConfiguration defaultConf = new HamaConfiguration();
       // report address
       String host = args[0];
@@ -1240,18 +1245,21 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
       long superstep = Long.parseLong(args[4]);
       TaskStatus.State state = TaskStatus.State.valueOf(args[5]);
       LOG.debug("Starting peer for step " + superstep + " state = " + state);
+      LOG.info("Starting peer for step " + superstep + " state = " + state);
 
       try {
         // use job-specified working directory
         FileSystem.get(job.getConfiguration()).setWorkingDirectory(
             job.getWorkingDirectory());
-
+              
+        LOG.info("instantiating BSPPeerImpl");
         // instantiate and init our peer
         @SuppressWarnings("rawtypes")
         final BSPPeerImpl<?, ?, ?, ?, ?> bspPeer = new BSPPeerImpl(job,
             defaultConf, taskid, umbilical, task.partition, task.splitClass,
             task.split, task.getCounters(), superstep, state);
 
+        LOG.info("instantiating BSPPeerImpl done, starting BSPTask now!");
         task.run(job, bspPeer, umbilical); // run the task
 
       } catch (FSError e) {

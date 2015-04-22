@@ -79,7 +79,7 @@ public abstract class ZKSyncClient implements SyncClient, Watcher {
    */
   protected String getNodeName(TaskAttemptID taskId, long superstep) {
     return constructKey(taskId.getJobID(), "sync", "" + superstep,
-        taskId.toString());
+        taskId.getTaskID().toString());
     //
     // bspRoot + "/" + taskId.getJobID().toString() + "/" + superstep + "/"
     // + taskId.toString();
@@ -331,7 +331,7 @@ public abstract class ZKSyncClient implements SyncClient, Watcher {
     ZKSyncEventListener zkListener = (ZKSyncEventListener) listener;
     key = correctKey(key);
     final String path = key;
-    LOG.info("Writing data " + path);
+    //LOG.info("Writing data " + path);
     return writeNode(path, value, permanent, zkListener);
   }
 

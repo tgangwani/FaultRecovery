@@ -184,6 +184,14 @@ public final class HamaAsyncMessageManagerImpl<M extends Writable> extends
   }
 
   @Override
+  public void fetch(String requestingPeerName, boolean current) throws IOException{
+  }                                             
+
+  @Override
+  public void getRecoveryData (String peerName, boolean current) {
+  }
+
+  @Override
   public final long getProtocolVersion(String arg0, long arg1)
       throws IOException {
     return versionID;

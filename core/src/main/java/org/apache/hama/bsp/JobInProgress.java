@@ -367,9 +367,18 @@ public class JobInProgress {
     Task result = null;
     String[] selectedGrooms = taskAllocationStrategy.selectGrooms(
         groomStatuses, taskCountInGroomMap, resources, task);
+
+    if(selectedGrooms != null)
+      System.out.println("Size of selectedGrooms set is " + selectedGrooms.length);
+    
+    // printing out the groom map.
+    for(String l : groomStatuses.keySet())
+      System.out.println("Groom:" + groomStatuses.get(l));
+
     GroomServerStatus groomStatus = taskAllocationStrategy
         .getGroomToAllocate(groomStatuses, selectedGrooms,
             taskCountInGroomMap, resources, task);
+    System.out.println("Groom server picked for task is " + groomStatus.getGroomName());
     if (groomStatus != null) {
       result = task.constructTask(groomStatus);
     } else if (LOG.isDebugEnabled()) {
@@ -697,6 +706,7 @@ public class JobInProgress {
     recoveryTasks.toArray(failedTasksInProgress);
 
     recoveryTasks.clear();
+    
     return failedTasksInProgress;
   }
 

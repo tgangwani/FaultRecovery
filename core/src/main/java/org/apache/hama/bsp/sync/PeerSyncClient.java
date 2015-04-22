@@ -62,6 +62,12 @@ public interface PeerSyncClient extends SyncClient {
       throws SyncException;
 
   /**
+   * Checks if a particular znode exists on zookeeper
+   */
+  public boolean check(TaskAttemptID taskId, long superstep)
+      throws SyncException;
+
+  /**
    * Registers a specific task with a its host and port to the sync daemon.
    * 
    * @param jobId the jobs ID

@@ -362,6 +362,10 @@ public class LocalBSPRunner implements JobSubmissionProtocol {
     public InetSocketAddress getListenerAddress() {
       return selfAddress;
     }
+
+    @Override
+    public void getRecoveryData (String peerName, boolean current) {
+    }
   }
 
   public static class LocalUmbilical implements BSPPeerProtocol {
@@ -455,6 +459,12 @@ public class LocalBSPRunner implements JobSubmissionProtocol {
       }
       if (superstep > superStepCount)
         superStepCount = superstep;
+    }
+
+    @Override
+    public boolean check(TaskAttemptID taskId, long superstep)
+      throws SyncException{
+      return false;
     }
 
     @Override

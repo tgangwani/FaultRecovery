@@ -85,7 +85,22 @@ public class OutgoingVertexMessageManager<M extends Writable> extends
   }
 
   @Override
+  public BSPMessageBundle<GraphJobMessage> getBundleFromPrevSuperstep(InetSocketAddress peerAddress) {
+    return prevOutgoingBundles.get(peerAddress);
+  }
+
+  @Override
   public void clear() {
+
+    prevOutgoingBundles.clear();
+
+    // save previous superstep bundles
+    Iterator<Entry<InetSocketAddress, BSPMessageBundle<GraphJobMessage>>> it = getBundleIterator();
+    while(it.hasNext()) {
+      Entry<InetSocketAddress, BSPMessageBundle<GraphJobMessage>> entry = it.next();
+      prevOutgoingBundles.put(entry.getKey(), entry.getValue());
+    }
+
     outgoingBundles.clear();
     storage.clear();
   }

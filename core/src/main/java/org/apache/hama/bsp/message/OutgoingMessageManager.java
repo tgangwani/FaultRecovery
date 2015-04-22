@@ -35,4 +35,5 @@ public interface OutgoingMessageManager<M extends Writable> {
 
   public Iterator<Entry<InetSocketAddress, BSPMessageBundle<M>>> getBundleIterator();
 
+  public BSPMessageBundle<M> getBundleFromPrevSuperstep(InetSocketAddress peerAddress);
 }

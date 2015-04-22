@@ -79,9 +79,50 @@ public class BestEffortDataLocalTaskAllocator implements TaskAllocationStrategy 
       Map<GroomServerStatus, Integer> tasksInGroomMap,
       String[] possibleLocations) {
 
+    // Round-robin allocation of tasks to Groom servers.
+                                
+    String groomServerWithMinTasks = null;
+    Integer minTasks = Integer.MAX_VALUE;
+
+    // find the groom server with the minimum number of tasks
     for (String location : possibleLocations) {
       GroomServerStatus groom = grooms.get(location);
       if (groom == null) {
+        System.out.println("Could not find groom for location " + location);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Could not find groom for location " + location);
+        }
+        continue;
+      }
+      
+      Integer tasksInGroom = tasksInGroomMap.get(groom);
+      tasksInGroom = (tasksInGroom == null) ? 0 : tasksInGroom;
+
+      if(tasksInGroom < minTasks) {
+        groomServerWithMinTasks = location;
+        minTasks = tasksInGroom;
+      }
+    }
+
+    // No groom server seems to be alive OR the number of tasks on each groom
+    // server has reached the maximum. (Assumes that each groomserver has equal
+    // task-holding capacity)
+    if(groomServerWithMinTasks == null || minTasks == grooms.get(groomServerWithMinTasks).getMaxTasks()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Returning null");
+      }
+      System.out.println("No groom server found for task.");
+      return null;
+    }
+
+    System.out.println("Task allocated to groom server " + groomServerWithMinTasks + ". Existing tasks on this groom server = " + minTasks);
+    return groomServerWithMinTasks;
+
+    /*
+    for (String location : possibleLocations) {
+      GroomServerStatus groom = grooms.get(location);
+      if (groom == null) {
+        System.out.println("Could not find groom for location " + location);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Could not find groom for location " + location);
         }
@@ -94,8 +135,10 @@ public class BestEffortDataLocalTaskAllocator implements TaskAllocationStrategy 
             + groom.getMaxTasks() + " location = " + location
             + " groomhostname = " + groom.getGroomHostName());
       }
+      System.out.println("getMaxTasks() for groom " + groom.getGroomName() + " returns " + groom.getMaxTasks() + ". Tasks already in groom " + taskInGroom);
       if (taskInGroom < groom.getMaxTasks()
           && location.equals(groom.getGroomHostName())) {
+        System.out.println("Allocating on groom " + groom.getGroomName());
         return groom.getGroomHostName();
       }
     }
@@ -103,6 +146,7 @@ public class BestEffortDataLocalTaskAllocator implements TaskAllocationStrategy 
       LOG.debug("Returning null");
     }
     return null;
+    */
   }
 
   @Override
@@ -142,6 +186,7 @@ public class BestEffortDataLocalTaskAllocator implements TaskAllocationStrategy 
   public String[] selectGrooms(Map<String, GroomServerStatus> groomStatuses,
       Map<GroomServerStatus, Integer> taskCountInGroomMap,
       BSPResource[] resources, TaskInProgress taskInProgress) {
+
     if (!taskInProgress.canStartTask()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Cannot start task based on id");

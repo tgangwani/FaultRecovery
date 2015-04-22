@@ -68,6 +68,36 @@ public interface BSPPeer<K1, V1, K2, V2, M extends Writable> extends Constants {
   public void sync() throws IOException, SyncException, InterruptedException;
 
   /**
+   * Called from a recovering peer. Fetches previous superstep data from alive peer to reconstruct state.
+   */
+  public void getPrevSuperstepData();
+  
+  /**
+   * Called from a recovering peer. Fetches current superstep data from alive peer to reconstruct state.
+   */
+  public void getThisSuperstepData();
+
+  /**
+   * Store log to zookeeper
+   */
+  public void persistLog(Writable[] writeArr) throws IOException;
+
+  /**
+   * Get persisted log from zookeeper
+   */
+  public Writable[] getLog() throws IOException;
+
+  /**
+   * Returns true if the peer is running a recovery task
+   */
+  public boolean isRecoveryTask();
+
+  /*
+   * Handles first sync for recovering task
+   */
+  public void doFirstSyncAfterRecovery() throws SyncException;
+
+  /**
    * @return the count of current super-step
    */
   public long getSuperstepCount();

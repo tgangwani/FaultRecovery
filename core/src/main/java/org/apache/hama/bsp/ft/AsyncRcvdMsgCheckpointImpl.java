@@ -112,7 +112,8 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
 
     @Override
     public boolean isRecoveryPossible(TaskInProgress tip) {
-      return currentAttemptId < maxTaskAttempts;
+      return true;
+      //return currentAttemptId < maxTaskAttempts;
     }
 
     @Override
@@ -135,10 +136,14 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
         recoverySet.put(failedTasksInProgres.getTaskId(), failedTasksInProgres);
       }
 
-      long lowestSuperstepNumber = Long.MAX_VALUE;
+      long lowestSuperstepNumber = Long.MIN_VALUE;
+      //long lowestSuperstepNumber = Long.MAX_VALUE;
+       
+      //String[] taskProgress = this.masterSyncClient.getChildKeySet(
+      //    this.masterSyncClient.constructKey(jobId, "checkpoint"), null);
 
       String[] taskProgress = this.masterSyncClient.getChildKeySet(
-          this.masterSyncClient.constructKey(jobId, "checkpoint"), null);
+          this.masterSyncClient.constructKey(jobId, "superstepRegisterAfterBarrier"), null);
 
       if (LOG.isDebugEnabled()) {
         StringBuffer list = new StringBuffer(25 * taskProgress.length);
@@ -150,7 +155,9 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
         LOG.debug(list);
       }
 
-      if (taskProgress.length == this.tasks.length) {
+      // code used only when checkpointing is enabled
+      //if (taskProgress.length == this.tasks.length) {
+      if (false) {
         for (String taskProgres : taskProgress) {
           ArrayWritable progressInformation = new ArrayWritable(
               LongWritable.class);
@@ -181,7 +188,28 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
             allTasksInProgress, taskCountInGroomMap, actionMap);
 
       } else {
-        restartJob(-1, groomStatuses, recoverySet, allTasksInProgress,
+        for (String taskProgres : taskProgress) {
+          ArrayWritable progressInformation = new ArrayWritable(LongWritable.class);  
+          boolean result = this.masterSyncClient.getInformation(
+            this.masterSyncClient.constructKey(jobId, "superstepRegisterAfterBarrier",
+                taskProgres), progressInformation);
+
+          if(!result) {
+            lowestSuperstepNumber = -1L;
+            break;
+          }
+
+          Writable[] progressArr = progressInformation.get();
+          LongWritable superstepProgress = (LongWritable) progressArr[0];
+        
+          if(superstepProgress != null) {
+            if(superstepProgress.get() > lowestSuperstepNumber) {
+              lowestSuperstepNumber = superstepProgress.get();
+            }
+          }
+        }
+
+        restartJob(lowestSuperstepNumber, groomStatuses, recoverySet, allTasksInProgress,
             taskCountInGroomMap, actionMap);
       }
 
@@ -222,7 +250,8 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
         throws IOException {
       String path = conf.get("bsp.checkpoint.prefix_path", "/checkpoint/");
 
-      if (superstep >= 0) {
+      //if (superstep >= 0) {
+      if (false) {
         FileSystem fileSystem = FileSystem.get(conf);
         for (TaskInProgress allTask : allTasks) {
           String[] hosts = null;
@@ -257,20 +286,40 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
             Task task = allTask.constructTask(serverStatus);
             populateAction(task, superstep, serverStatus, actionMap);
 
-          } else {
-            restartTask(allTask, superstep, groomStatuses, actionMap);
-          }
+          } //else {
+            //restartTask(allTask, superstep, groomStatuses, actionMap);
+          //}
         }
       } else {
         // Start the task from the beginning.
         for (TaskInProgress allTask : allTasks) {
           if (recoveryMap.containsKey(allTask.getTaskId())) {
-            this.allocationStrategy.getGroomToAllocate(groomStatuses,
+
+            // update task count in map
+            Integer count = taskCountInGroomMap.get(allTask
+                .getGroomServerStatus());
+            if (count != null) {
+              count = count.intValue() - 1;
+              taskCountInGroomMap.put(allTask.getGroomServerStatus(), count);
+            }
+
+            GroomServerStatus serverStatus = this.allocationStrategy.getGroomToAllocate(groomStatuses,
                 this.allocationStrategy.selectGrooms(groomStatuses,
                     taskCountInGroomMap, new BSPResource[0], allTask),
                 taskCountInGroomMap, new BSPResource[0], allTask);
+
+            // update task count in map
+            int tasksInGroom = 0;
+            if (taskCountInGroomMap.containsKey(serverStatus)) {
+              tasksInGroom = taskCountInGroomMap.get(serverStatus);
+            }
+            taskCountInGroomMap.put(serverStatus, tasksInGroom + 1);
+
+            Task task = allTask.constructTask(serverStatus);
+            populateAction(task, superstep, serverStatus, actionMap);
+
           } else {
-            restartTask(allTask, superstep, groomStatuses, actionMap);
+            //restartTask(allTask, superstep, groomStatuses, actionMap);
           }
         }
       }
@@ -364,6 +413,22 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
       return ckptPath;
     }
 
+    // Ask the alive bspPeers for information so as to construct own state after failure recovery
+    @Override
+    public TaskStatus.State onPeerInitialized(TaskStatus.State state)
+            throws Exception{
+
+        if(this.superstep >= 0 && state.equals(TaskStatus.State.RECOVERING)){
+            String thisPeerName = peer.getPeerName();
+            LOG.info("bspPeer " + thisPeerName + " started pinging alive peers for data");
+            peer.getPrevSuperstepData();
+            LOG.info("Prev. superstep data recovery complete for " + thisPeerName);
+        }
+        this.messenger.registerListener(this);
+        return TaskStatus.State.RUNNING;
+    }
+    
+    /*
     @Override
     public TaskStatus.State onPeerInitialized(TaskStatus.State state)
         throws Exception {
@@ -412,16 +477,18 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
       return TaskStatus.State.RUNNING;
 
     }
+    */
 
     public final boolean isReadyToCheckpoint() {
 
       checkPointInterval = conf.getInt(Constants.CHECKPOINT_INTERVAL, 1);
-      LOG.info(new StringBuffer(1000).append("Enabled = ")
+      /*LOG.info(new StringBuffer(1000).append("Enabled = ")
           .append(conf.getBoolean(Constants.CHECKPOINT_ENABLED, false))
           .append(" checkPointInterval = ").append(checkPointInterval)
           .append(" lastCheckPointStep = ").append(lastCheckPointStep)
           .append(" getSuperstepCount() = ").append(peer.getSuperstepCount())
           .toString());
+          */
       if (LOG.isDebugEnabled())
         LOG.debug(new StringBuffer(1000).append("Enabled = ")
             .append(conf.getBoolean(Constants.CHECKPOINT_ENABLED, false))
@@ -445,6 +512,17 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
 
     @Override
     public void afterBarrier() throws Exception {
+
+      synchronized (this) {
+        ArrayWritable writableArray = new ArrayWritable(LongWritable.class);
+        Writable[] writeArr = new Writable[1];
+        writeArr[0] = new LongWritable(peer.getSuperstepCount());
+        writableArray.set(writeArr);
+
+        this.syncClient.storeInformation(this.syncClient.constructKey(
+            this.job.getJobID(), "superstepRegisterAfterBarrier",
+            String.valueOf(peer.getPeerIndex())), writableArray, true, null);
+      }
 
       synchronized (this) {
         if (checkpointState) {
@@ -476,8 +554,30 @@ public class AsyncRcvdMsgCheckpointImpl<M extends Writable> implements
         checkpointMessageCount = 0;
       }
 
-      LOG.info("checkpointNext = " + checkpointState
-          + " checkpointMessageCount = " + checkpointMessageCount);
+      //LOG.info("checkpointNext = " + checkpointState
+      //    + " checkpointMessageCount = " + checkpointMessageCount);
+    }
+
+    @Override
+    public void persist(Writable[] writeArr) throws Exception {
+        ArrayWritable writableArray = new ArrayWritable(LongWritable.class);
+        writableArray.set(writeArr);
+
+        this.syncClient.storeInformation(this.syncClient.constructKey(
+            this.job.getJobID(), "StartLog", Integer.toString(0)), writableArray, true, null);
+    }
+
+    @Override
+    public Writable[] get() throws Exception {
+      ArrayWritable log = new ArrayWritable(LongWritable.class);  
+      boolean result = this.syncClient.getInformation(
+         this.syncClient.constructKey(this.job.getJobID(), "StartLog", Integer.toString(0)), log);
+
+      if(!result) {
+        LOG.info("Can't retrieve persistent log. Nothing registered by master.");
+        return null;
+      }
+      return log.get();
     }
 
     @Override

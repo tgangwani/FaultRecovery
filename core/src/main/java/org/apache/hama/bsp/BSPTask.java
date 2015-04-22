@@ -141,6 +141,7 @@ public final class BSPTask extends Task {
 
     startPingingGroom(job, umbilical);
     try {
+      LOG.info("Starting runBSP from BSPTask");
       runBSP(job, bspPeer, split, umbilical);
       done(umbilical);
     } finally {
@@ -167,8 +168,13 @@ public final class BSPTask extends Task {
     // The policy is to throw the first exception and log the remaining.
     Exception firstException = null;
     try {
+      LOG.info("[BSPTask.java] Starting with bsp.setup");
       bsp.setup(bspPeer);
+      
+      LOG.info("[BSPTask.java] Starting with bsp.bsp");
       bsp.bsp(bspPeer);
+
+      LOG.info("[BSPTask.java] Done with bsp.bsp");
     } catch (Exception e) {
       LOG.error("Error running bsp setup and bsp function.", e);
       firstException = e;

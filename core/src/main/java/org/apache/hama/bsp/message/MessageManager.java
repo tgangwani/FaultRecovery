@@ -73,6 +73,11 @@ public interface MessageManager<M extends Writable> {
   public void send(String peerName, M msg) throws IOException;
 
   /**
+   * Asks alive bspPeers to send data for restoration after failure.
+   */
+  public void getRecoveryData (String peerName, boolean current);
+  
+  /**
    * Returns an bundle of messages grouped by peer.
    * 
    */

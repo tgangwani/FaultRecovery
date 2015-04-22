@@ -59,4 +59,14 @@ public interface FaultTolerantPeerService<M extends Writable> {
    */
   public void afterBarrier() throws Exception;
 
+  /**
+   * Persist a log on fault-tolerant service
+   */
+  public void persist(Writable[] writeArr) throws Exception;
+
+  /**
+   * Retrieve log from fault-tolerant service
+   */
+  public Writable[] get() throws Exception; 
+
 }

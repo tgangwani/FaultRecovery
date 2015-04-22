@@ -263,7 +263,8 @@ public class TaskInProgress {
    * @return true if the task can start.
    */
   public boolean canStartTask() {
-    return (nextTaskId < (MAX_TASK_EXECS + maxTaskAttempts));
+    return true;
+    //return (nextTaskId < (MAX_TASK_EXECS + maxTaskAttempts));
   }
 
   private TaskAttemptID computeTaskId() {

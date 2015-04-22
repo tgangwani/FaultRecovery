@@ -28,6 +28,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
@@ -101,25 +102,64 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
   // -1 is deactivated
   private int maxIteration = -1;
   private long iteration;
+  private boolean recoveryTask = false;
 
   private AggregationRunner<V, E, M> aggregationRunner;
   private VertexOutputWriter<Writable, Writable, V, E, M> vertexOutputWriter;
 
   private BSPPeer<Writable, Writable, Writable, Writable, GraphJobMessage> peer;
+  
+  ArrayWritable log = new ArrayWritable(LongWritable.class);
+
+  private void redoSuperstep() throws IOException, SyncException, InterruptedException {
+    
+    Writable[] info = peer.getLog();
+
+    // We are not calling countGlobalVertexCount for the recovering peer. Hence,
+    // we ge this data from the log stored by master peer.
+    numberVertices = ((LongWritable)info[0]).get();
+    LOG.info("Recovering peer reading from log: " + numberVertices + " vertices");
+
+    // update the value of local variables
+    iteration = peer.getSuperstepCount(); 
+
+    // onPeerInitialized has put messages from prevSuperstep outgoingBundles on
+    // alive peers into the localQ
+    GraphJobMessage firstVertexMessage = parseMessages(peer);
+    doSuperstep(firstVertexMessage, peer);
+  }
 
   @Override
   public final void setup(
       BSPPeer<Writable, Writable, Writable, Writable, GraphJobMessage> peer)
       throws IOException, SyncException, InterruptedException {
-
+ 
+    LOG.info("[GraphJobRunner] Entering setup.");  
+    recoveryTask = peer.isRecoveryTask();
+      
     setupFields(peer);
 
     loadVertices(peer);
 
-    countGlobalVertexCount(peer);
+    if(recoveryTask == false) {
+      countGlobalVertexCount(peer);
+
+      // master task writes to persistent storage at the start of the
+      // computation. This information is used by recovering peers
+      if (isMasterTask(peer)) {
+        Writable[] writeArr = new Writable[1];
+        writeArr[0] = new LongWritable(numberVertices);
+        log.set(writeArr);
+        peer.persistLog(log.get());
+      }
+    }
 
     doInitialSuperstep(peer);
 
+    if(recoveryTask) {
+      redoSuperstep();
+      peer.doFirstSyncAfterRecovery();
+    }
   }
 
   @Override
@@ -127,18 +167,30 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
       BSPPeer<Writable, Writable, Writable, Writable, GraphJobMessage> peer)
       throws IOException, SyncException, InterruptedException {
 
+    LOG.info("Entered GraphRunner.bsp. Is recovery task? " + recoveryTask);
+    int superstepsAsRecovery=0;
     // we do supersteps while we still have updates and have not reached our
     // maximum iterations yet
     while (updated && !((maxIteration > 0) && iteration > maxIteration)) {
       // reset the global update counter from our master in every
       // superstep
       globalUpdateCounts = 0;
-      peer.sync();
+
+      // for the recovery task, the first sync() is done as part of
+      // peer.doFirstSyncAfterRecovery()
+      if(recoveryTask) {
+        recoveryTask = false;
+      }
+      else {
+        peer.sync();
+      }
 
       // note that the messages must be parsed here
       GraphJobMessage firstVertexMessage = parseMessages(peer);
       // master/slaves needs to update
+      
       doAggregationUpdates(peer);
+      
       // check if updated changed by our aggregators
       if (!updated) {
         break;
@@ -151,7 +203,6 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
         peer.getCounter(GraphJobCounter.ITERATIONS).increment(1);
       }
     }
-
   }
 
   /**
@@ -202,12 +253,14 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
       }
     }
 
-    if (getAggregationRunner().isEnabled()) {
+    // Not syncing here may cause aggregate values from the master(tree root) to
+    // reach the leaves one superstep late. But that should be ok.
+    /*if (getAggregationRunner().isEnabled()) {
       peer.sync();
       // now the map message must be read that might be send from the master
       updated = getAggregationRunner().receiveAggregatedValues(
           peer.getCurrentMessage().getMap(), iteration);
-    }
+    }*/
   }
 
   private Set<V> notComputedVertices;
@@ -228,6 +281,10 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
 
     notComputedVertices = new HashSet();
     notComputedVertices.addAll(vertices.keySet());
+
+    // Simulating bspPeer failure!
+    if(recoveryTask == false && peer.getPeerName().equals("slave1:61001") && peer.getSuperstepCount()%10 == 0)
+      System.exit(49);
 
     Vertex<V, E, M> vertex = null;
 
@@ -288,7 +345,10 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
     }
 
     vertices.finishSuperstep();
-    getAggregationRunner().sendAggregatorValues(peer, 1, this.changedVertexCnt);
+
+    if(recoveryTask == false)
+      getAggregationRunner().sendAggregatorValues(peer, 1, this.changedVertexCnt);
+
     iteration++;
   }
 
@@ -477,11 +537,11 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
             } else {
               globalUpdateCounts += ((IntWritable) e.getValue()).get();
             }
-          } else if (getAggregationRunner().isEnabled()
+          } else if (getAggregationRunner().isEnabled() && isMasterTask(peer) 
               && vertexID.toString().startsWith(S_FLAG_AGGREGATOR_VALUE)) {
             getAggregationRunner().masterReadAggregatedValue(vertexID,
                 (M) e.getValue());
-          } else if (getAggregationRunner().isEnabled()
+          } else if (getAggregationRunner().isEnabled() && isMasterTask(peer)
               && vertexID.toString().startsWith(S_FLAG_AGGREGATOR_INCREMENT)) {
             getAggregationRunner().masterReadAggregatedIncrementalValue(
                 vertexID, (M) e.getValue());

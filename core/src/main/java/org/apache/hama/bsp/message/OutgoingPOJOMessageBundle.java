@@ -64,6 +64,11 @@ public class OutgoingPOJOMessageBundle<M extends Writable> extends
   }
 
   @Override
+  public BSPMessageBundle<M> getBundleFromPrevSuperstep(InetSocketAddress peerAddress) {
+      return prevOutgoingBundles.get(peerAddress); 
+  }
+  
+  @Override
   public void clear() {
     outgoingBundles.clear();
   }
