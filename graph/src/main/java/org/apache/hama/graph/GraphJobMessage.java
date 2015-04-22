@@ -52,6 +52,7 @@ public final class GraphJobMessage implements
   private MapWritable map;
   @SuppressWarnings("rawtypes")
   private WritableComparable vertexId;
+  private WritableComparable srcVertexId;
   private IntWritable integerMessage;
   private static GraphJobMessageComparator comparator;
 
@@ -65,6 +66,10 @@ public final class GraphJobMessage implements
     }
 
     WritableComparator.define(GraphJobMessage.class, comparator);
+  }
+
+  public WritableComparable<?> getSrcVertexId() {
+      return this.srcVertexId;
   }
 
   public GraphJobMessage() {
@@ -81,6 +86,15 @@ public final class GraphJobMessage implements
 
     add(vertexValue);
   }
+
+
+    public GraphJobMessage(WritableComparable<?> vertexId, Writable vertexValue, WritableComparable<?> srcVertexId) {
+        this.flag = VERTEX_FLAG;
+        this.vertexId = vertexId;
+        this.srcVertexId = srcVertexId;
+
+        add(vertexValue);
+    }
 
   public GraphJobMessage(WritableComparable<?> vertexId, List<Writable> values) {
     this.flag = VERTEX_FLAG;

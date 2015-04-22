@@ -54,7 +54,7 @@ public interface Constants {
   public static final String GROOM_PING_PERIOD = "bsp.groomserver.pingperiod";
 
   /** Default value of ping period in milliseconds. */
-  public static final long DEFAULT_GROOM_PING_PERIOD = 5000;
+  public static final long DEFAULT_GROOM_PING_PERIOD = 1000;
 
   /** When we encode strings, we always specify UTF8 encoding */
   public static final String UTF8_ENCODING = "UTF-8";

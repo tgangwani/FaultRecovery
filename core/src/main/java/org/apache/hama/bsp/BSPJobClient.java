@@ -304,21 +304,20 @@ public class BSPJobClient extends Configured implements Tool {
     job.setJobID(jobId);
 
     int maxTasks;
-    int configured = job.getConfiguration().getInt(Constants.MAX_TASKS_PER_JOB,
-        job.getNumBspTask());
+    if (job.getConfiguration().getBoolean("hama.yarn.application", false)) {
+      int maxMem = job.getConfiguration().getInt("yarn.nodemanager.resource.memory-mb", 0);
+      int minAllocationMem = job.getConfiguration().getInt("yarn.scheduler.minimum-allocation-mb", 1024);
+      maxTasks = maxMem / minAllocationMem;
+    } else {
+      ClusterStatus clusterStatus = getClusterStatus(true);
+      maxTasks = job.getConfiguration().getInt(Constants.MAX_TASKS_PER_JOB,
+          clusterStatus.getMaxTasks() - clusterStatus.getTasks());
 
-    ClusterStatus clusterStatus = getClusterStatus(true);
-    // Re-adjust the maxTasks based on cluster status.
-    if (clusterStatus != null) {
-      maxTasks = clusterStatus.getMaxTasks() - clusterStatus.getTasks();
-
-      if (configured > maxTasks) {
+      if (maxTasks < job.getNumBspTask()) {
         LOG.warn("The configured number of tasks has exceeded the maximum allowed. Job will run with "
-            + (maxTasks) + " tasks.");
+            + maxTasks + " tasks.");
         job.setNumBspTask(maxTasks);
       }
-    } else {
-      maxTasks = configured;
     }
 
     Path submitJobDir = new Path(getSystemDir(), "submit_"
@@ -795,8 +794,7 @@ public class BSPJobClient extends Configured implements Tool {
    * @throws IOException
    */
   public ClusterStatus getClusterStatus(boolean detailed) throws IOException {
-    return (jobSubmitClient != null) ? jobSubmitClient
-        .getClusterStatus(detailed) : null;
+    return jobSubmitClient.getClusterStatus(detailed);
   }
 
   // for the testcase
@@ -1006,7 +1004,7 @@ public class BSPJobClient extends Configured implements Tool {
    * Helper methods for unix operations
    */
 
-  protected static String getUnixUserName() throws IOException {
+  static String getUnixUserName() throws IOException {
     String[] result = executeShellCommand(new String[] { Shell.USER_NAME_COMMAND });
     if (result.length != 1) {
       throw new IOException("Expect one token as the result of "

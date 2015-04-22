@@ -18,11 +18,8 @@
 package org.apache.hama.graph;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -112,20 +109,33 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
   ArrayWritable log = new ArrayWritable(LongWritable.class);
 
   private void redoSuperstep() throws IOException, SyncException, InterruptedException {
-    
-    Writable[] info = peer.getLog();
+    List<GraphJobMessage> stateHints = peer.retrieveStateHints();
+    for (GraphJobMessage m : stateHints) {
+        if (m.getNumOfValues() != 1)
+            System.out.println("SET MESSAGE NUMVALUES:" + m.getNumOfValues());
 
-    // We are not calling countGlobalVertexCount for the recovering peer. Hence,
-    // we ge this data from the log stored by master peer.
-    numberVertices = ((LongWritable)info[0]).get();
-    LOG.info("Recovering peer reading from log: " + numberVertices + " vertices");
+        Vertex v = vertices.get((V) m.getSrcVertexId());
+        Iterable<Writable> it = m.getIterableMessages();
+        if (it.iterator().hasNext()) {
+            v.setValue(it.iterator().next());
+        }
+    }
 
     // update the value of local variables
-    iteration = peer.getSuperstepCount(); 
+    iteration = peer.getSuperstepCount() - 1;
 
     // onPeerInitialized has put messages from prevSuperstep outgoingBundles on
     // alive peers into the localQ
     GraphJobMessage firstVertexMessage = parseMessages(peer);
+
+    GraphJobMessage currentMsg = firstVertexMessage;
+    while (currentMsg != null) {
+        Iterator<Writable> it = currentMsg.getIterableMessages().iterator();
+        while (it.hasNext()) {
+        LOG.info("SRC: " + firstVertexMessage.getSrcVertexId() + " DST " + firstVertexMessage + " Recovering Message " + it.next() + " on superstep " + peer.getSuperstepCount());
+        }
+        currentMsg = peer.getCurrentMessage();
+    }
     doSuperstep(firstVertexMessage, peer);
   }
 
@@ -136,10 +146,23 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
  
     LOG.info("[GraphJobRunner] Entering setup.");  
     recoveryTask = peer.isRecoveryTask();
+
+    if (recoveryTask == true) {
+        Writable[] info = peer.getLog();
+
+        // We are not calling countGlobalVertexCount for the recovering peer. Hence,
+        // we ge this data from the log stored by master peer.
+        numberVertices = ((LongWritable)info[0]).get();
+        //LOG.info("Recovering peer reading from log: " + numberVertices + " vertices");
+    }
       
     setupFields(peer);
 
+    long start_time = System.nanoTime();
     loadVertices(peer);
+    long end_time = System.nanoTime();
+    double difference = (end_time - start_time)/1e9;
+    //LOG.info("graph loading seconds " + difference);
 
     if(recoveryTask == false) {
       countGlobalVertexCount(peer);
@@ -283,8 +306,13 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
     notComputedVertices.addAll(vertices.keySet());
 
     // Simulating bspPeer failure!
-    if(recoveryTask == false && peer.getPeerName().equals("slave1:61001") && peer.getSuperstepCount()%10 == 0)
+
+    LOG.info(peer.getPeerName());
+    if(recoveryTask == false && peer.getPeerName().equals("slave:61001") && peer.getSuperstepCount()%20 == 0) {
+      LOG.info("simulated failure");
       System.exit(49);
+    }
+
 
     Vertex<V, E, M> vertex = null;
 
@@ -339,8 +367,16 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
 
       // Calls setup method.
       vertex.setup(conf);
-
+      /*
+      LOG.info("Prior to compute");
+      LOG.info("Vertex Get Val" + vertex.getValue() + " NumVertices " + vertex.getNumVertices());
+      if (recoveryTask)
+          LOG.info("SuperStepCount : " + vertex.getSuperstepCount());
+      */
       vertex.compute(Collections.singleton(vertex.getValue()));
+      /*
+      LOG.info("After Compute");
+      */
       vertices.finishVertexComputation(vertex);
     }
 

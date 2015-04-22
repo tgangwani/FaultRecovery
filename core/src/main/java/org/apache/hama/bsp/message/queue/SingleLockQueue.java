@@ -18,10 +18,12 @@
 package org.apache.hama.bsp.message.queue;
 
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hama.bsp.BSPMessageBundle;
+import org.apache.hama.bsp.BSPPeer;
 import org.apache.hama.bsp.TaskAttemptID;
 
 /**
@@ -54,12 +56,22 @@ public final class SingleLockQueue<T extends Writable> implements
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * @see
-   * org.apache.hama.bsp.message.SynchronizedQueue#setConf(org.apache.hadoop
-   * .conf.Configuration)
-   */
+  @Override
+  public List<T> getStateHints() {
+      return null;
+  }
+
+    @Override
+    public List<T> getRelevantMessages(String peerName) {
+        return null;
+    }
+
+    /*
+     * (non-Javadoc)
+     * @see
+     * org.apache.hama.bsp.message.SynchronizedQueue#setConf(org.apache.hadoop
+     * .conf.Configuration)
+     */
   @Override
   public void setConf(Configuration conf) {
     synchronized (mutex) {
@@ -91,10 +103,15 @@ public final class SingleLockQueue<T extends Writable> implements
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hama.bsp.message.SynchronizedQueue#close()
-   */
+    @Override
+    public void init(Configuration conf, TaskAttemptID id, BSPPeer peerRef) {
+
+    }
+
+    /*
+     * (non-Javadoc)
+     * @see org.apache.hama.bsp.message.SynchronizedQueue#close()
+     */
   @Override
   public void close() {
     synchronized (mutex) {
@@ -115,10 +132,15 @@ public final class SingleLockQueue<T extends Writable> implements
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hama.bsp.message.SynchronizedQueue#add(T)
-   */
+    @Override
+    public void addAllRecovery(Iterable<T> col) {
+
+    }
+
+    /*
+     * (non-Javadoc)
+     * @see org.apache.hama.bsp.message.SynchronizedQueue#add(T)
+     */
   @Override
   public void add(T item) {
     synchronized (mutex) {
@@ -133,10 +155,15 @@ public final class SingleLockQueue<T extends Writable> implements
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hama.bsp.message.SynchronizedQueue#clear()
-   */
+    @Override
+    public void addBundleRecovery(BSPMessageBundle<T> bundle) {
+
+    }
+
+    /*
+     * (non-Javadoc)
+     * @see org.apache.hama.bsp.message.SynchronizedQueue#clear()
+     */
   @Override
   public void clear() {
     synchronized (mutex) {

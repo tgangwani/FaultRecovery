@@ -21,7 +21,10 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hama.bsp.BSPMessageBundle;
+import org.apache.hama.bsp.BSPPeer;
 import org.apache.hama.bsp.TaskAttemptID;
+
+import java.util.List;
 
 /**
  * Simple queue interface.
@@ -36,32 +39,47 @@ public interface MessageQueue<M extends Writable> extends Iterable<M>,
    */
   public void init(Configuration conf, TaskAttemptID id);
 
+  public void init(Configuration conf, TaskAttemptID id, BSPPeer peerRef);
+
   /**
    * Finally close the queue. Commonly used to free resources.
    */
   public void close();
 
-  /**
-   * Adds a whole Java Collection to the implementing queue.
-   */
-  public void addAll(Iterable<M> col);
+    /**
+     * Adds a whole Java Collection to the implementing queue.
+     */
+    public void addAll(Iterable<M> col);
+
+    /**
+     * Adds a whole Java Collection to the implementing queue.
+     */
+    public void addAllRecovery(Iterable<M> col);
 
   /**
    * Adds the other queue to this queue.
    */
   public void addAll(MessageQueue<M> otherqueue);
 
-  /**
-   * Adds the received bundle
-   * 
-   * @param bundle
-   */
-  public void addBundle(BSPMessageBundle<M> bundle);
+    /**
+     * Adds the received bundle
+     *
+     * @param bundle
+     */
+    public void addBundle(BSPMessageBundle<M> bundle);
 
-  /**
-   * Adds a single item to the implementing queue.
-   */
-  public void add(M item);
+
+    /**
+     * Adds the received bundle for recovery
+     *
+     * @param bundle
+     */
+    public void addBundleRecovery(BSPMessageBundle<M> bundle);
+
+    /**
+     * Adds a single item to the implementing queue.
+     */
+    public void add(M item);
 
   /**
    * Clears all entries in the given queue.
@@ -80,4 +98,7 @@ public interface MessageQueue<M extends Writable> extends Iterable<M>,
    */
   public int size();
 
+  public List<M> getStateHints();
+
+  public List<M> getRelevantMessages(String peerName);
 }

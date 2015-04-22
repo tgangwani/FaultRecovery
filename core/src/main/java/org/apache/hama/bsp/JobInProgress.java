@@ -265,6 +265,7 @@ public class JobInProgress {
       numBSPTasks = splits.length;
       LOG.info("num BSPTasks: " + numBSPTasks);
 
+      // pagerank uses this path
       // adjust number of BSP tasks to actual number of splits
       this.tasks = new TaskInProgress[numBSPTasks];
       for (int i = 0; i < numBSPTasks; i++) {

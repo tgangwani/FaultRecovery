@@ -340,7 +340,7 @@ public final class BSPPeerImpl<K1, V1, K2, V2, M extends Writable> implements
     syncClient = SyncServiceFactory.getPeerSyncClient(conf);
     syncClient.init(conf, taskId.getJobID(), taskId);
     syncClient.register(taskId.getJobID(), taskId, peerAddress.getHostName(),
-        peerAddress.getPort());
+            peerAddress.getPort());
   }
 
   private void doFirstSync(long superstep) throws SyncException {
@@ -445,10 +445,15 @@ public final class BSPPeerImpl<K1, V1, K2, V2, M extends Writable> implements
     messenger.send(peerName, msg);
   }
 
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hama.bsp.BSPPeerInterface#sync()
-   */
+    @Override
+    public List<M> retrieveStateHints() {
+        return messenger.retrieveStateHints();
+    }
+
+    /*
+     * (non-Javadoc)
+     * @see org.apache.hama.bsp.BSPPeerInterface#sync()
+     */
   @Override
   public final void sync() throws IOException, SyncException,
       InterruptedException {
@@ -520,9 +525,11 @@ public final class BSPPeerImpl<K1, V1, K2, V2, M extends Writable> implements
     // TODO: We should only contact the peers which reside on other groomservers
     // since the other peers on my groomserver have failed too.
       for(String peerName : getAllPeerNames()) {
-          if(!peerName.equals(getPeerName())) {
+          if(!peerName.split(":")[0].equals(peerAddress.getHostName())) {
               messenger.getRecoveryData(peerName, false);
-          }   
+          } else {
+              LOG.info("Skipping request to " + peerName + '-' + peerName.split(":")[0] + '-' + peerAddress.getHostName());
+          }
       }   
   }
   
@@ -531,9 +538,11 @@ public final class BSPPeerImpl<K1, V1, K2, V2, M extends Writable> implements
     // TODO: We should only contact the peers which reside on other groomservers
     // since the other peers on my groomserver have failed too.
       for(String peerName : getAllPeerNames()) {
-          if(!peerName.equals(getPeerName())) {
+          if(!peerName.split(":")[0].equals(peerAddress.getHostName())) {
               messenger.getRecoveryData(peerName, true);
-          }   
+          } else {
+              LOG.info("Skipping request to " + peerName + '-' + peerName.split(":")[0] + '-' + peerAddress.getHostName());
+          }
       }   
   }
 

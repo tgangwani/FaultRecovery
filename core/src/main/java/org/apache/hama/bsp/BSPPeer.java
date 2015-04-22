@@ -18,6 +18,7 @@
 package org.apache.hama.bsp;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.hadoop.io.Writable;
 import org.apache.hama.Constants;
@@ -43,6 +44,8 @@ public interface BSPPeer<K1, V1, K2, V2, M extends Writable> extends Constants {
    * @throws IOException
    */
   public void send(String peerName, M msg) throws IOException;
+
+  public List<M> retrieveStateHints();
 
   /**
    * @return A message from the peer's received messages queue (a FIFO).

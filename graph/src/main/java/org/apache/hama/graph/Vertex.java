@@ -31,6 +31,8 @@ import org.apache.hama.HamaConfiguration;
 import org.apache.hama.bsp.BSPPeer;
 import org.apache.hama.bsp.Counters.Counter;
 import org.apache.hama.bsp.Partitioner;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Vertex is a abstract definition of Google Pregel Vertex. For implementing a
@@ -59,6 +61,9 @@ public abstract class Vertex<V extends WritableComparable, E extends Writable, M
   private M value;
   private List<Edge<V, E>> edges;
 
+  private static final Log LOG = LogFactory
+            .getLog(Vertex.class);
+
   private boolean votedToHalt = false;
 
   public HamaConfiguration getConf() {
@@ -77,7 +82,7 @@ public abstract class Vertex<V extends WritableComparable, E extends Writable, M
   @Override
   public void sendMessage(Edge<V, E> e, M msg) throws IOException {
     runner.getPeer().send(getDestinationPeerName(e),
-        new GraphJobMessage(e.getDestinationVertexID(), msg));
+        new GraphJobMessage(e.getDestinationVertexID(), msg, vertexID));
   }
 
   /**
@@ -112,7 +117,7 @@ public abstract class Vertex<V extends WritableComparable, E extends Writable, M
         runner.getPeer().getNumPeers());
     String destPeer = runner.getPeer().getAllPeerNames()[partition];
     runner.getPeer().send(destPeer,
-        new GraphJobMessage(destinationVertexID, msg));
+        new GraphJobMessage(destinationVertexID, msg, vertexID));
   }
 
   private void alterVertexCounter(int i) throws IOException {
@@ -183,6 +188,7 @@ public abstract class Vertex<V extends WritableComparable, E extends Writable, M
   public void setValue(M value) {
     this.oldValue = this.value;
     this.value = value;
+    //LOG.info("Setting " + vertexID + " value " + value);
   }
 
   public void setVertexID(V vertexID) {

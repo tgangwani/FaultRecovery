@@ -223,6 +223,7 @@ public class BSPJob extends BSPJobContext {
   public boolean waitForCompletion(boolean verbose) throws IOException,
       InterruptedException, ClassNotFoundException {
     if (state == JobState.DEFINE) {
+      System.out.println("Submitting Job");
       submit();
     }
 

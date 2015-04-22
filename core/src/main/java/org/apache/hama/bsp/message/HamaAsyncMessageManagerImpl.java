@@ -171,7 +171,12 @@ public final class HamaAsyncMessageManagerImpl<M extends Writable> extends
     loopBackBundle(bundle);
   }
 
-  @Override
+    @Override
+    public void put_(BSPMessageBundle<M> messages) throws IOException {
+
+    }
+
+    @Override
   public void put(byte[] compressedBundle) throws IOException {
     byte[] decompressed = compressor.decompress(compressedBundle);
 
@@ -183,7 +188,12 @@ public final class HamaAsyncMessageManagerImpl<M extends Writable> extends
     loopBackBundle(bundle);
   }
 
-  @Override
+    @Override
+    public void put_(byte[] compressedBundle) throws IOException {
+
+    }
+
+    @Override
   public void fetch(String requestingPeerName, boolean current) throws IOException{
   }                                             
 

@@ -17,7 +17,10 @@
  */
 package org.apache.hama.graph;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -27,6 +30,8 @@ public class MessagePerVertex {
 
   @SuppressWarnings("rawtypes")
   private final ConcurrentNavigableMap<WritableComparable, GraphJobMessage> storage = new ConcurrentSkipListMap<WritableComparable, GraphJobMessage>();
+  private final HashMap<WritableComparable, ArrayList<WritableComparable>> vertexIdOffsetMap =
+                                            new HashMap<WritableComparable, ArrayList<WritableComparable>>();
 
   public int size() {
     return storage.size();
@@ -41,12 +46,26 @@ public class MessagePerVertex {
     storage.put(vertexId, graphJobMessage);
   }
 
-  public void add(WritableComparable<?> vertexID, GraphJobMessage msg) {
+  public HashMap<WritableComparable, ArrayList<WritableComparable>>  getVertexIdOffsetMap() {
+      return vertexIdOffsetMap;
+  }
+  public ConcurrentNavigableMap<WritableComparable, GraphJobMessage> getMessageAggregatorMap() {
+      return storage;
+  }
+
+  public void add(WritableComparable vertexID, GraphJobMessage msg) {
+    ArrayList<WritableComparable> list;
     if (storage.containsKey(vertexID)) {
       storage.get(vertexID).addValuesBytes(msg.getValuesBytes(), msg.size());
+      list = vertexIdOffsetMap.get(vertexID);
     } else {
       put(vertexID, msg);
+      list = new ArrayList<WritableComparable>();
+      vertexIdOffsetMap.put(vertexID, list);
     }
+
+    for (int i = 0; i < msg.getNumOfValues(); i += 1)
+        list.add(msg.getSrcVertexId());
   }
 
   @SuppressWarnings("rawtypes")

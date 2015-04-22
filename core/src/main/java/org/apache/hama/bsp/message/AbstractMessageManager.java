@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Queue;
 
@@ -203,7 +204,7 @@ public abstract class AbstractMessageManager<M extends Writable> implements
     MessageQueue<M> queue = ReflectionUtils.newInstance(conf.getClass(
         MessageManager.RECEIVE_QUEUE_TYPE_CLASS, MemoryQueue.class,
         MessageQueue.class));
-    queue.init(conf, attemptId);
+    queue.init(conf, attemptId, this.peer);
     return queue;
   }
 
@@ -262,6 +263,15 @@ public abstract class AbstractMessageManager<M extends Writable> implements
     // notifyReceivedMessage(bundle);
   }
 
+
+   public void loopBackBundle_(BSPMessageBundle<M> bundle) throws IOException {
+       peer.incrementCounter(BSPPeerImpl.PeerCounter.TOTAL_MESSAGES_RECEIVED, bundle.size());
+       this.localQueueForNextIteration.addBundleRecovery(bundle);
+
+        // TODO checkpoint bundle itself instead of unpacked messages. -- edwardyoon
+        // notifyReceivedMessage(bundle);
+   }
+
   @SuppressWarnings("unchecked")
   @Override
   public void loopBackMessage(Writable message) throws IOException {
@@ -269,4 +279,7 @@ public abstract class AbstractMessageManager<M extends Writable> implements
     notifyReceivedMessage((M) message);
   }
 
+  public List<M> retrieveStateHints() {
+      return localQueueForNextIteration.getStateHints();
+  }
 }

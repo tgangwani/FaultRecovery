@@ -17,30 +17,81 @@
  */
 package org.apache.hama.graph;
 
-import java.util.Iterator;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentNavigableMap;
 
+
+//import com.sun.tools.javac.util.Log;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.Writable;
 import org.apache.hama.bsp.BSPMessageBundle;
+import org.apache.hama.bsp.BSPPeer;
 import org.apache.hama.bsp.TaskAttemptID;
 import org.apache.hama.bsp.message.queue.MessageQueue;
 import org.apache.hama.bsp.message.queue.SynchronizedQueue;
+
+import org.apache.hama.bsp.HashPartitioner;
+
 
 public class IncomingVertexMessageManager<M extends WritableComparable<M>>
     implements SynchronizedQueue<GraphJobMessage> {
 
   private Configuration conf;
+  protected BSPPeer<?, ?, ?, ?, M> peer;
+  private List<GraphJobMessage> stateHints = new ArrayList<GraphJobMessage>();
+
+  private static final Log LOG = LogFactory
+            .getLog(IncomingVertexMessageManager.class);
 
   private final MessagePerVertex msgPerVertex = new MessagePerVertex();
+
   private final ConcurrentLinkedQueue<GraphJobMessage> mapMessages = new ConcurrentLinkedQueue<GraphJobMessage>();
 
+  public List<GraphJobMessage> getStateHints() {
+      return stateHints;
+  }
   @Override
   public Iterator<GraphJobMessage> iterator() {
     return msgPerVertex.iterator();
   }
 
-  @Override
+  public List<GraphJobMessage> getRelevantMessages(String peerName) {
+      HashPartitioner<WritableComparable,IntWritable> partitioner = new HashPartitioner();
+      List<GraphJobMessage> msgs = new ArrayList<GraphJobMessage>();
+      HashMap<WritableComparable, ArrayList<WritableComparable>> offsetMap = msgPerVertex.getVertexIdOffsetMap();
+      ConcurrentNavigableMap<WritableComparable, GraphJobMessage> aggregatorMap = msgPerVertex.getMessageAggregatorMap();
+
+      for (WritableComparable<?> dstVertexId : offsetMap.keySet()) {
+
+          ArrayList<WritableComparable> list = offsetMap.get(dstVertexId);
+          GraphJobMessage aggregatorGraphMsg = aggregatorMap.get(dstVertexId);
+          byte[] valueArray = aggregatorGraphMsg.getValuesBytes();
+          int messageSizeBytes = valueArray.length / aggregatorGraphMsg.getNumOfValues();
+
+
+          Iterator<WritableComparable> it = list.iterator();
+          Iterator<Writable> aggregateIt = aggregatorGraphMsg.getIterableMessages().iterator();
+          while(it.hasNext()) {
+              WritableComparable srcId = it.next();
+              int partition = partitioner.getPartition(srcId , null, peer.getNumPeers());
+              String srcPeer = peer.getAllPeerNames()[partition];
+              if (srcPeer == peerName) {
+                  GraphJobMessage newMsg = new GraphJobMessage(dstVertexId, aggregateIt.next(), srcId);
+                  msgs.add(newMsg);
+              } else {
+                  aggregateIt.next();
+              }
+          }
+      }
+    return msgs;
+  }
+
+    @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
@@ -50,16 +101,40 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
     return conf;
   }
 
-  @Override
-  public void addBundle(BSPMessageBundle<GraphJobMessage> bundle) {
-    addAll(bundle);
-  }
-  
-  @Override
-  public void addAll(Iterable<GraphJobMessage> col) {
-    for (GraphJobMessage m : col)
-      add(m);
-  }
+    @Override
+    public void addBundle(BSPMessageBundle<GraphJobMessage> bundle) {
+        addAll(bundle);
+    }
+
+    @Override
+    public void addBundleRecovery(BSPMessageBundle<GraphJobMessage> bundle) {
+        addAllRecovery(bundle);
+    }
+
+    @Override
+    public void addAll(Iterable<GraphJobMessage> col) {
+        for (GraphJobMessage m : col)
+            add(m);
+    }
+
+    @Override
+    public void addAllRecovery(Iterable<GraphJobMessage> col) {
+
+        HashPartitioner<WritableComparable,IntWritable> partitioner = new HashPartitioner();
+        for (GraphJobMessage m : col)
+        {
+           int partition = partitioner.getPartition(m.getSrcVertexId(), null, peer.getNumPeers());
+           String srcPeer = peer.getAllPeerNames()[partition];
+           if (peer.getPeerName() == srcPeer) {
+               if (m.isVertexMessage())
+
+                   LOG.info("Num Values:" + m.getNumOfValues() + " first val:" + m.getIterableMessages().iterator().next());
+                   stateHints.add(m);
+           } else {
+               add(m);
+           }
+        }
+    }
 
   @Override
   public void addAll(MessageQueue<GraphJobMessage> otherqueue) {
@@ -69,14 +144,14 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
     }
   }
 
-  @Override
-  public void add(GraphJobMessage item) {
-    if (item.isVertexMessage()) {
-      msgPerVertex.add(item.getVertexId(), item);
-    } else if (item.isMapMessage() || item.isVerticesSizeMessage()) {
-      mapMessages.add(item);
+    @Override
+    public void add(GraphJobMessage item) {
+        if (item.isVertexMessage()) {
+            msgPerVertex.add(item.getVertexId(), item);
+        } else if (item.isMapMessage() || item.isVerticesSizeMessage()) {
+            mapMessages.add(item);
+        }
     }
-  }
 
   @Override
   public void clear() {
@@ -100,6 +175,11 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
   // empty, not needed to implement
   @Override
   public void init(Configuration conf, TaskAttemptID id) {
+  }
+
+  @Override
+  public void init(Configuration conf, TaskAttemptID id, BSPPeer peerRef) {
+      this.peer = peerRef;
   }
 
   @Override

@@ -20,6 +20,7 @@ package org.apache.hama.bsp.message;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.apache.hadoop.io.Writable;
@@ -127,4 +128,8 @@ public interface MessageManager<M extends Writable> {
    * on.
    */
   public InetSocketAddress getListenerAddress();
+
+
+
+    public List<M> retrieveStateHints();
 }

@@ -18,11 +18,13 @@
 package org.apache.hama.bsp.message.queue;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hama.bsp.BSPMessageBundle;
+import org.apache.hama.bsp.BSPPeer;
 import org.apache.hama.bsp.TaskAttemptID;
 
 /**
@@ -43,14 +45,33 @@ public final class MemoryQueue<M extends Writable> implements
     numOfMsg += bundle.size();
     bundles.add(bundle);
   }
+    @Override
+    public List<M> getStateHints() {
+        return null;
+    }
 
-  @Override
+    @Override
+    public List<M> getRelevantMessages(String peerName) {
+        return null;
+    }
+
+    @Override
+    public void addBundleRecovery(BSPMessageBundle<M> bundle) {
+
+    }
+
+    @Override
   public final void addAll(Iterable<M> col) {
     for (M m : col)
       deque.add(m);
   }
 
-  @Override
+    @Override
+    public void addAllRecovery(Iterable<M> col) {
+
+    }
+
+    @Override
   public void addAll(MessageQueue<M> otherqueue) {
     M poll = null;
     while ((poll = otherqueue.poll()) != null) {
@@ -107,7 +128,12 @@ public final class MemoryQueue<M extends Writable> implements
     this.conf = conf;
   }
 
-  @Override
+    @Override
+    public void init(Configuration conf, TaskAttemptID id, BSPPeer peerRef) {
+
+    }
+
+    @Override
   public void close() {
     this.clear();
   }

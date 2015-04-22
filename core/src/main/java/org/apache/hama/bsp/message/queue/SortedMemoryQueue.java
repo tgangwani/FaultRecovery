@@ -18,12 +18,14 @@
 package org.apache.hama.bsp.message.queue;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hama.bsp.BSPMessageBundle;
+import org.apache.hama.bsp.BSPPeer;
 import org.apache.hama.bsp.TaskAttemptID;
 
 /**
@@ -40,8 +42,17 @@ public final class SortedMemoryQueue<M extends WritableComparable<M>>
   public Iterator<M> iterator() {
     return queue.iterator();
   }
+    @Override
+    public List<M> getStateHints(){
+        return null;
+    }
 
-  @Override
+    @Override
+    public List<M> getRelevantMessages(String peerName) {
+        return null;
+    }
+
+    @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
@@ -56,13 +67,23 @@ public final class SortedMemoryQueue<M extends WritableComparable<M>>
     addAll(bundle);
   }
 
-  @Override
+    @Override
+    public void addBundleRecovery(BSPMessageBundle<M> bundle) {
+
+    }
+
+    @Override
   public void addAll(Iterable<M> col) {
     for (M m : col)
       queue.add(m);
   }
 
-  @Override
+    @Override
+    public void addAllRecovery(Iterable<M> col) {
+
+    }
+
+    @Override
   public void addAll(MessageQueue<M> otherqueue) {
     M poll = null;
     while ((poll = otherqueue.poll()) != null) {
@@ -96,7 +117,12 @@ public final class SortedMemoryQueue<M extends WritableComparable<M>>
     this.conf = conf;
   }
 
-  @Override
+    @Override
+    public void init(Configuration conf, TaskAttemptID id, BSPPeer peerRef) {
+
+    }
+
+    @Override
   public void close() {
     this.clear();
   }
