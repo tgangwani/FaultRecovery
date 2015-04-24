@@ -135,7 +135,7 @@ public final class HamaMessageManagerImpl<M extends Writable> extends
         bspPeerConnection.fetch(peer.getPeerName(), current);
       }
     } catch (Exception e) {
-      LOG.info("Could not recovery data from peer " + peerName);
+      LOG.info("Could not recover data from peer " + peerName);
       LOG.info(e.toString());
     }
   }
@@ -243,13 +243,14 @@ public final class HamaMessageManagerImpl<M extends Writable> extends
     @Override
   public final void fetch(String requestingPeerName, boolean current)
           throws IOException {
-      LOG.info("bspPeer " + peer.getPeerName() + " received request for previous superstep data from bspPeer " + requestingPeerName);
+
       InetSocketAddress requestingPeerAddress = BSPNetUtils.getAddress(requestingPeerName);
       BSPMessageBundle<M> bundle = null;
       
       // if current == true, return messages for current superstep, else
       // messages for previous superstep.
       if(current) {
+        LOG.info("bspPeer " + peer.getPeerName() + " received request for this superstep data from bspPeer " + requestingPeerName);
         Iterator<Map.Entry<InetSocketAddress, BSPMessageBundle<M>>> it = outgoingMessageManager.getBundleIterator();
         while(it.hasNext()) {
           Map.Entry<InetSocketAddress, BSPMessageBundle<M>> entry = it.next();
@@ -262,26 +263,25 @@ public final class HamaMessageManagerImpl<M extends Writable> extends
         return;
       }
       else {
+        LOG.info("bspPeer " + peer.getPeerName() + " received request for previous superstep data from bspPeer " + requestingPeerName);
         bundle = outgoingMessageManager.getBundleFromPrevSuperstep(requestingPeerAddress);
-        //transfer(requestingPeerAddress, bundle);
       }
 
-      // TODO: We also need to transfer some portion of the localQueue
-
+       // transfer those messages from the localQ of the peer which have
+      // source-id of vertex belonging to the requestingPeerName. Partitioner is
+      // used to determine such messages
        List<M> stateMsgs = localQueue.getRelevantMessages(requestingPeerName);
-       if (bundle == null)
+
+       if (bundle == null && stateMsgs.size() > 0)
            bundle = new BSPMessageBundle<M>();
 
        for (M m : stateMsgs)
             bundle.addMessage(m);
 
-
        if(bundle == null)
             LOG.info("Found no bundle for requesting peer: " + requestingPeerName + " at peer: " + peer.getPeerName());
        else
             transfer_(requestingPeerAddress, bundle);
-
-
     }
 
   @Override

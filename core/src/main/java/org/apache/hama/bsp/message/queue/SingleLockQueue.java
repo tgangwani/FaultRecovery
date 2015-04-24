@@ -58,12 +58,16 @@ public final class SingleLockQueue<T extends Writable> implements
 
   @Override
   public List<T> getStateHints() {
-      return null;
+    synchronized (mutex) {
+      return queue.getStateHints();
+    }
   }
 
     @Override
     public List<T> getRelevantMessages(String peerName) {
-        return null;
+      synchronized (mutex) {
+        return queue.getRelevantMessages(peerName);
+      }
     }
 
     /*
@@ -105,7 +109,9 @@ public final class SingleLockQueue<T extends Writable> implements
 
     @Override
     public void init(Configuration conf, TaskAttemptID id, BSPPeer peerRef) {
-
+      synchronized (mutex) {
+        queue.init(conf, id, peerRef);
+      }
     }
 
     /*
@@ -134,7 +140,9 @@ public final class SingleLockQueue<T extends Writable> implements
 
     @Override
     public void addAllRecovery(Iterable<T> col) {
-
+      synchronized (mutex) {
+        queue.addAllRecovery(col);
+      }
     }
 
     /*
@@ -157,7 +165,9 @@ public final class SingleLockQueue<T extends Writable> implements
 
     @Override
     public void addBundleRecovery(BSPMessageBundle<T> bundle) {
-
+      synchronized (mutex) {
+        queue.addBundleRecovery(bundle);
+      }
     }
 
     /*
@@ -200,8 +210,13 @@ public final class SingleLockQueue<T extends Writable> implements
   @Override
   public MessageQueue<T> getMessageQueue() {
     synchronized (mutex) {
+      queue.save();
       return queue;
     }
+  }
+
+  @Override
+  public void save() {
   }
 
   /*
@@ -209,7 +224,8 @@ public final class SingleLockQueue<T extends Writable> implements
    */
   public static <T extends Writable> SynchronizedQueue<T> synchronize(
       MessageQueue<T> queue) {
-    return (SynchronizedQueue<T>) queue;
+    //return (SynchronizedQueue<T>) queue;
+    return new SingleLockQueue<T>(queue);
   }
 
   public static <T extends Writable> SynchronizedQueue<T> synchronize(

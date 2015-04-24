@@ -79,6 +79,9 @@ public class JobInProgress {
   // Indicates how many times the job got restarted
   private int restartCount;
 
+  // lock to use with recoveryTasks set
+  private Object lock = new Object(); 
+
   long startTime;
   long launchTime;
   long finishTime;
@@ -687,7 +690,11 @@ public class JobInProgress {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Adding recovery task " + tip.getCurrentTaskAttemptId());
       }
-      recoveryTasks.add(tip);
+      
+      synchronized(lock) {
+        recoveryTasks.add(tip);
+      }
+      
       status.setRunState(JobStatus.RECOVERING);
       return true;
     } else if (LOG.isDebugEnabled()) {
@@ -702,17 +709,33 @@ public class JobInProgress {
    * @return Returns the list of tasks in progress that has to be recovered.
    */
   synchronized TaskInProgress[] fetchAndClearTasksToRecover() {
-    TaskInProgress[] failedTasksInProgress = new TaskInProgress[recoveryTasks
-        .size()];
-    recoveryTasks.toArray(failedTasksInProgress);
+    //TaskInProgress[] failedTasksInProgress = new TaskInProgress[recoveryTasks
+    //    .size()];
+    
+    TaskInProgress[] failedTasksInProgress = new TaskInProgress[1];
 
-    recoveryTasks.clear();
+    synchronized(lock) {
+      for(TaskInProgress tip : recoveryTasks) {
+        failedTasksInProgress[0] = tip;
+        recoveryTasks.remove(tip);
+        break;
+      }
+    }
+    
+    if(failedTasksInProgress[0] == null) {
+      LOG.info("[ERROR] No task to recover in recoveryTasks set.");
+    }
+
+    //recoveryTasks.toArray(failedTasksInProgress);
+    //recoveryTasks.clear();
     
     return failedTasksInProgress;
   }
 
   public boolean isRecoveryPending() {
-    return recoveryTasks.size() != 0;
+    synchronized(lock) {
+      return recoveryTasks.size() != 0;
+    }
   }
 
   public Set<Task> getTaskSet() {

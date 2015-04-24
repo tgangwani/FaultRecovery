@@ -87,6 +87,11 @@ public interface MessageQueue<M extends Writable> extends Iterable<M>,
   public void clear();
 
   /**
+   * Save the storage into shadow storage
+   */
+  public void save();
+  
+  /**
    * Polls for the next item in the queue (FIFO).
    * 
    * @return a new item or null if none are present.

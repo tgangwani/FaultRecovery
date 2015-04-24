@@ -125,7 +125,8 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
   /** Map from taskId -> TaskInProgress. */
   Map<TaskAttemptID, TaskInProgress> runningTasks = null;
   Map<TaskAttemptID, TaskInProgress> finishedTasks = null;
-  Map<TaskAttemptID, Integer> assignedPeerNames = null;
+  Map<TaskID, Integer> assignedPeerNames = null;
+  //Map<TaskAttemptID, Integer> assignedPeerNames = null;
   Map<BSPJobID, RunningJob> runningJobs = null;
 
   // new nexus between GroomServer and BSPMaster
@@ -166,7 +167,7 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
 
             synchronized (assignedPeerNames) {
               prevPort = BSPNetUtils.getNextAvailable(prevPort);
-              assignedPeerNames.put(t.getTaskID(), prevPort);
+              assignedPeerNames.put(t.getTaskID().getTaskID(), prevPort);
             }
 
             LOG.info("Launch " + actions.length + " tasks.");
@@ -181,7 +182,7 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
                 tip.killAndCleanup(false);
                 tasks.remove(killAction.getTaskID());
                 runningTasks.remove(killAction.getTaskID());
-                assignedPeerNames.remove(killAction.getTaskID());
+                assignedPeerNames.remove(killAction.getTaskID().getTaskID());
               } catch (IOException ioe) {
                 throw new DirectiveException("Error when killing a "
                     + "TaskInProgress.", ioe);
@@ -192,10 +193,14 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
             RecoverTaskAction recoverAction = (RecoverTaskAction) action;
             Task t = recoverAction.getTask();
 
-            synchronized (assignedPeerNames) {
+            // Comment out to ensure that recovery task uses the same
+            // peerAddress as the failed task. This is done by storing
+            // taskAttempt.getTaskID() in the assignedPeerNames map rather than
+            // taskAttempt
+            /*synchronized (assignedPeerNames) {
               prevPort = BSPNetUtils.getNextAvailable(prevPort);
               assignedPeerNames.put(t.getTaskID(), prevPort);
-            }
+            }*/
 
             LOG.info("Recovery action task." + t.getTaskID());
             try {
@@ -328,7 +333,7 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
     this.conf.set(Constants.PEER_HOST, localHostname);
     this.conf.set(Constants.GROOM_RPC_HOST, localHostname);
     this.maxCurrentTasks = conf.getInt(Constants.MAX_TASKS_PER_GROOM, 3);
-    this.assignedPeerNames = new HashMap<TaskAttemptID, Integer>(
+    this.assignedPeerNames = new HashMap<TaskID, Integer>(
         2 * this.maxCurrentTasks);
 
     int rpcPort = -1;
@@ -1370,7 +1375,7 @@ public class GroomServer implements Runnable, GroomProtocol, BSPPeerProtocol,
 
   @Override
   public int getAssignedPortNum(TaskAttemptID taskid) {
-    return assignedPeerNames.get(taskid);
+    return assignedPeerNames.get(taskid.getTaskID());
   }
 
   @Override

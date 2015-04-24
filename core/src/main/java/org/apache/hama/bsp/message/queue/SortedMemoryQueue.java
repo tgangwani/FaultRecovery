@@ -128,6 +128,10 @@ public final class SortedMemoryQueue<M extends WritableComparable<M>>
   }
 
   @Override
+  public void save() {
+  }
+
+  @Override
   public MessageQueue<M> getMessageQueue() {
     return this;
   }

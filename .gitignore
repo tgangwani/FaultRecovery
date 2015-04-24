@@ -11,3 +11,22 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+
+# special files
+run.x
+genGraph.x
+
+# directories to ignore
+bin/
+commons/
+contrib/
+dist/
+lib/
+ml/
+src/
+yarn/
+c++/
+docs/
+mesos/
+target/
+logs/

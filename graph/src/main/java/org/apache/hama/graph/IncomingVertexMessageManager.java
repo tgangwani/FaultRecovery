@@ -61,18 +61,20 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
   }
 
   public List<GraphJobMessage> getRelevantMessages(String peerName) {
-      HashPartitioner<WritableComparable,IntWritable> partitioner = new HashPartitioner();
+      HashPartitioner<WritableComparable, IntWritable> partitioner = new HashPartitioner();
       List<GraphJobMessage> msgs = new ArrayList<GraphJobMessage>();
-      HashMap<WritableComparable, ArrayList<WritableComparable>> offsetMap = msgPerVertex.getVertexIdOffsetMap();
-      ConcurrentNavigableMap<WritableComparable, GraphJobMessage> aggregatorMap = msgPerVertex.getMessageAggregatorMap();
+      ConcurrentNavigableMap<WritableComparable, List<WritableComparable>> offsetMap = msgPerVertex.getVertexIdOffsetMap();
+      HashMap<WritableComparable, GraphJobMessage> aggregatorMap = msgPerVertex.getMessageAggregatorMap();
+      if(offsetMap.size() != aggregatorMap.size()) {
+        LOG.info("[ERROR IncomingVertexManager.java] Size mismatch!");
+      }
 
       for (WritableComparable<?> dstVertexId : offsetMap.keySet()) {
 
-          ArrayList<WritableComparable> list = offsetMap.get(dstVertexId);
+          List<WritableComparable> list = offsetMap.get(dstVertexId);
           GraphJobMessage aggregatorGraphMsg = aggregatorMap.get(dstVertexId);
           byte[] valueArray = aggregatorGraphMsg.getValuesBytes();
           int messageSizeBytes = valueArray.length / aggregatorGraphMsg.getNumOfValues();
-
 
           Iterator<WritableComparable> it = list.iterator();
           Iterator<Writable> aggregateIt = aggregatorGraphMsg.getIterableMessages().iterator();
@@ -80,7 +82,7 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
               WritableComparable srcId = it.next();
               int partition = partitioner.getPartition(srcId , null, peer.getNumPeers());
               String srcPeer = peer.getAllPeerNames()[partition];
-              if (srcPeer == peerName) {
+              if (srcPeer.equals(peerName)) {
                   GraphJobMessage newMsg = new GraphJobMessage(dstVertexId, aggregateIt.next(), srcId);
                   msgs.add(newMsg);
               } else {
@@ -120,18 +122,21 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
     @Override
     public void addAllRecovery(Iterable<GraphJobMessage> col) {
 
-        HashPartitioner<WritableComparable,IntWritable> partitioner = new HashPartitioner();
+        HashPartitioner<WritableComparable, IntWritable> partitioner = new HashPartitioner();
         for (GraphJobMessage m : col)
         {
-           int partition = partitioner.getPartition(m.getSrcVertexId(), null, peer.getNumPeers());
-           String srcPeer = peer.getAllPeerNames()[partition];
-           if (peer.getPeerName() == srcPeer) {
-               if (m.isVertexMessage())
-
-                   LOG.info("Num Values:" + m.getNumOfValues() + " first val:" + m.getIterableMessages().iterator().next());
+           if (m.isVertexMessage()) {
+             int partition = partitioner.getPartition(m.getSrcVertexId(), null, peer.getNumPeers());
+             String srcPeer = peer.getAllPeerNames()[partition];
+             if (peer.getPeerName().equals(srcPeer)) {
                    stateHints.add(m);
-           } else {
+             }
+             else {
                add(m);
+             }
+           }
+           else {
+            add(m);
            }
         }
     }
@@ -192,5 +197,12 @@ public class IncomingVertexMessageManager<M extends WritableComparable<M>>
     return this;
   }
 
-
+  @Override
+  public void save() {
+    // this function is called when localQ is made to refer to localQ-for-next-iteration
+    // i.e after enterBarrier. This means all the messages from peers have been
+    // received in msgPerVertex.storage. Hence we can save storage into a shadow
+    // map
+    msgPerVertex.saveShadow();
+  }
 }

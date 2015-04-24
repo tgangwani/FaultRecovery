@@ -110,6 +110,7 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
 
   private void redoSuperstep() throws IOException, SyncException, InterruptedException {
     List<GraphJobMessage> stateHints = peer.retrieveStateHints();
+    LOG.info("Retrieved StateHints. Size=" + stateHints.size());
     for (GraphJobMessage m : stateHints) {
         if (m.getNumOfValues() != 1)
             System.out.println("SET MESSAGE NUMVALUES:" + m.getNumOfValues());
@@ -127,15 +128,6 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
     // onPeerInitialized has put messages from prevSuperstep outgoingBundles on
     // alive peers into the localQ
     GraphJobMessage firstVertexMessage = parseMessages(peer);
-
-    GraphJobMessage currentMsg = firstVertexMessage;
-    while (currentMsg != null) {
-        Iterator<Writable> it = currentMsg.getIterableMessages().iterator();
-        while (it.hasNext()) {
-        LOG.info("SRC: " + firstVertexMessage.getSrcVertexId() + " DST " + firstVertexMessage + " Recovering Message " + it.next() + " on superstep " + peer.getSuperstepCount());
-        }
-        currentMsg = peer.getCurrentMessage();
-    }
     doSuperstep(firstVertexMessage, peer);
   }
 
@@ -308,11 +300,12 @@ public final class GraphJobRunner<V extends WritableComparable, E extends Writab
     // Simulating bspPeer failure!
 
     LOG.info(peer.getPeerName());
-    if(recoveryTask == false && peer.getPeerName().equals("slave:61001") && peer.getSuperstepCount()%20 == 0) {
+    
+    //if(recoveryTask == false && peer.getPeerName().equals("slave1:61001") && peer.getSuperstepCount()%20 == 0) {
+    if(recoveryTask == false && peer.getPeerName().contains("slave1") && peer.getSuperstepCount()%20 == 0) {
       LOG.info("simulated failure");
       System.exit(49);
     }
-
 
     Vertex<V, E, M> vertex = null;
 

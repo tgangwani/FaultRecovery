@@ -279,7 +279,9 @@ public abstract class AbstractMessageManager<M extends Writable> implements
     notifyReceivedMessage((M) message);
   }
 
+  // onPeerInitialized has pushed messages into the localQueue from
+  // localQ-for-next-iteration by the time this is called
   public List<M> retrieveStateHints() {
-      return localQueueForNextIteration.getStateHints();
+      return localQueue.getStateHints();
   }
 }

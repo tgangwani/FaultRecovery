@@ -30,42 +30,48 @@ public class MessagePerVertex {
 
   @SuppressWarnings("rawtypes")
   private final ConcurrentNavigableMap<WritableComparable, GraphJobMessage> storage = new ConcurrentSkipListMap<WritableComparable, GraphJobMessage>();
-  private final HashMap<WritableComparable, ArrayList<WritableComparable>> vertexIdOffsetMap =
-                                            new HashMap<WritableComparable, ArrayList<WritableComparable>>();
+  
+  // shodow of storage is required since during the iteration, pollFirstEntry on
+  // storage removes the messages rather than just reading them. It is used for
+  // fault recovery
+  private final HashMap<WritableComparable, GraphJobMessage> shadowStorage = new HashMap<WritableComparable, GraphJobMessage>();
+  private final ConcurrentNavigableMap<WritableComparable, List<WritableComparable>> vertexIdOffsetMap =
+                                            new ConcurrentSkipListMap<WritableComparable, List<WritableComparable>>();
 
   public int size() {
     return storage.size();
   }
 
   public void clear() {
+    vertexIdOffsetMap.clear();
+    shadowStorage.clear();
     storage.clear();
   }
 
   @SuppressWarnings("rawtypes")
   public void put(WritableComparable vertexId, GraphJobMessage graphJobMessage) {
     storage.put(vertexId, graphJobMessage);
+    vertexIdOffsetMap.put(vertexId, new ArrayList<WritableComparable>());
   }
 
-  public HashMap<WritableComparable, ArrayList<WritableComparable>>  getVertexIdOffsetMap() {
+  public ConcurrentNavigableMap<WritableComparable, List<WritableComparable>>  getVertexIdOffsetMap() {
       return vertexIdOffsetMap;
   }
-  public ConcurrentNavigableMap<WritableComparable, GraphJobMessage> getMessageAggregatorMap() {
-      return storage;
+  public HashMap<WritableComparable, GraphJobMessage> getMessageAggregatorMap() {
+      return shadowStorage;
   }
 
   public void add(WritableComparable vertexID, GraphJobMessage msg) {
-    ArrayList<WritableComparable> list;
     if (storage.containsKey(vertexID)) {
       storage.get(vertexID).addValuesBytes(msg.getValuesBytes(), msg.size());
-      list = vertexIdOffsetMap.get(vertexID);
     } else {
       put(vertexID, msg);
-      list = new ArrayList<WritableComparable>();
-      vertexIdOffsetMap.put(vertexID, list);
     }
 
-    for (int i = 0; i < msg.getNumOfValues(); i += 1)
+    List<WritableComparable> list = vertexIdOffsetMap.get(vertexID);
+    for (int i = 0; i < msg.getNumOfValues(); i += 1) {
         list.add(msg.getSrcVertexId());
+      }
   }
 
   @SuppressWarnings("rawtypes")
@@ -86,4 +92,9 @@ public class MessagePerVertex {
     return (storage.size() > 0) ? storage.pollFirstEntry().getValue() : null;
   }
 
+  public void saveShadow() {
+    for(WritableComparable key : storage.keySet()) {
+      shadowStorage.put(key, storage.get(key));
+    }
+  }
 }

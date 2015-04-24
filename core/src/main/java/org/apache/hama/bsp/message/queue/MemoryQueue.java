@@ -139,6 +139,10 @@ public final class MemoryQueue<M extends Writable> implements
   }
 
   @Override
+  public void save() {
+  }
+  
+  @Override
   public MessageQueue<M> getMessageQueue() {
     return this;
   }
